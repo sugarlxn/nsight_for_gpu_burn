@@ -1,0 +1,37 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: nsys-gpu-burn
+spec:
+  template:
+    metadata:
+      labels:
+        app: nsys-gpu-burn
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: gpu-burn-profiler
+        image: nsys_gpu_burn:0.1
+        command: ["nsys"]
+        args:
+          - "profile"
+          - "--stats=true"
+          - "--force-overwrite=true"
+          - "-o"
+          - "/output/gpu_burn_profile"
+          - "./gpu_burn"
+          - "10"
+        resources:
+          limits:
+            nvidia.com/gpu: 1
+        volumeMounts:
+        - name: output-volume
+          mountPath: /output
+      volumes:
+      - name: output-volume
+        hostPath:
+          path: /data/nsys-output
+          type: DirectoryOrCreate
+      nodeSelector:
+        # 可选：指定有 GPU 的节点
+        accelerator: nvidia-gpu
