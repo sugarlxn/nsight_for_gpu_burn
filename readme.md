@@ -1,5 +1,7 @@
 # nsys_gpu_burn
 
+fork from [gpu-burn](https://github.com/wilicc/gpu-burn)
+
 ## Build
 docker build -t nsys_gpu_burn:0.1 .
 
