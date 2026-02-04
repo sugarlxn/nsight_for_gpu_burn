@@ -29,9 +29,11 @@ spec:
               args: [
                   "mpirun \
                   --allow-run-as-root \
-                  -mca pml ucx \
-                  --mca osc ucx \
                   --mca plm_rsh_args '-p 2222' \
+                  --mca pml ucx \
+                  --mca btl ^openib \
+                  --mca coll_hcoll_enable 0 \
+                  --mca coll_ucc_enable 0 \
                   -n 8 \
                   -bind-to none \
                   -x LD_LIBRARY_PATH \
@@ -39,11 +41,13 @@ spec:
                   -x NCCL_NVLS_ENABLE=0 \
                   -x NCCL_SHARP_DISABLE=1 \
                   -x NCCL_COLLNET_ENABLE=0 \
-                  -x UCX_TLS=sm,cuda_copy,cuda_ipc \
+                  -x UCX_TLS=all \
+                  -x UCX_NET_DEVICES=mlx5_0:1,mlx5_1:1,mlx5_2:1,mlx5_3:1,mlx5_4:1,mlx5_5:1,mlx5_6:1,mlx5_7:1 \
                   -x NCCL_DEBUG=INFO \
                   -x NCCL_GDR_READ=1 \
                   -x NCCL_IB_HCA=mlx5_0,mlx5_1,mlx5_2,mlx5_3,mlx5_4,mlx5_5,mlx5_6,mlx5_7 \
-                  -x NCCL_IB_GID_INDEX=0 \
+                  -x NCCL_IB_GID_INDEX=3 \
+                  -x NCCL_SOCKET_IFNAME=ens99f0 \
                   /opt/nccl_tests/build/all_reduce_perf -b 8 -e 8G -f 2 -g 1"
                 ]
               resources:
