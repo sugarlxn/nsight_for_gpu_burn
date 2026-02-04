@@ -1,0 +1,108 @@
+apiVersion: kubeflow.org/v2beta1
+kind: MPIJob
+metadata:
+  name: nccl-test-8-h200-8n
+  namespace: superalarm
+spec:
+  slotsPerWorker: 4
+  runPolicy:
+    cleanPodPolicy: Running
+  mpiReplicaSpecs:
+    Launcher:
+      replicas: 1
+      template:
+        spec:
+          # 必须添加 hostNetwork: true
+          hostNetwork: true
+          # 添加 dnsPolicy: ClusterFirstWithHostNet
+          dnsPolicy: ClusterFirstWithHostNet
+          containers:
+            - image: crpi-yi8z3nukml86oxa7.cn-guangzhou.personal.cr.aliyuncs.com/acr_image/nsys_nccl_test:0.1
+              name: nccl
+              env:
+                - name: OMPI_ALLOW_RUN_AS_ROOT
+                  value: "1"
+                - name: OMPI_ALLOW_RUN_AS_ROOT_CONFIRM
+                  value: "1"
+              command: ["/bin/bash", "-c"]
+              # 这里填入了你提供的完整 mpirun 命令
+              args: [
+                  "mpirun \
+                  --allow-run-as-root \
+                  -mca pml ucx \
+                  --mca osc ucx \
+                  --mca plm_rsh_args '-p 2222' \
+                  -n 8 \
+                  -bind-to none \
+                  -x LD_LIBRARY_PATH \
+                  -x PATH \
+                  -x NCCL_NVLS_ENABLE=0 \
+                  -x NCCL_SHARP_DISABLE=1 \
+                  -x NCCL_COLLNET_ENABLE=0 \
+                  -x UCX_TLS=sm,cuda_copy,cuda_ipc \
+                  -x NCCL_DEBUG=INFO \
+                  -x NCCL_GDR_READ=1 \
+                  -x NCCL_IB_HCA=mlx5_0,mlx5_1,mlx5_2,mlx5_3,mlx5_4,mlx5_5,mlx5_6,mlx5_7 \
+                  -x NCCL_IB_GID_INDEX=0 \
+                  /opt/nccl_tests/build/all_reduce_perf -b 8 -e 8G -f 2 -g 1"
+                ]
+              resources:
+                requests:
+                  cpu: 2
+                  memory: 128Mi
+    Worker:
+      replicas: 2
+      template:
+        metadata:
+          labels:
+            metadata.coreweave.cloud/job: nccl-test
+        spec:
+          # 对应 docker run --network host --ipc host
+          hostNetwork: true
+          hostIPC: true
+          dnsPolicy: ClusterFirstWithHostNet
+          containers:
+            - image: crpi-yi8z3nukml86oxa7.cn-guangzhou.personal.cr.aliyuncs.com/acr_image/nsys_nccl_test:0.1
+              name: nccl
+              command: ["/usr/sbin/sshd"]
+              args: ["-De", "-p", "2222"]
+              # 对应 docker run --privileged --cap-add ...
+              securityContext:
+                privileged: true
+                capabilities:
+                  add: ["SYS_ADMIN", "SYS_PTRACE"]
+              resources:
+                requests:
+                  cpu: 100
+                  memory: 400Gi
+                  nvidia.com/h200: 4
+                  # rdma/ib: 1
+                limits:
+                  memory: 400Gi
+                  nvidia.com/h200: 4
+                  # rdma/ib: 1
+              volumeMounts:
+                - mountPath: /dev/shm
+                  name: dshm
+                # 对应 docker run -v /dev/nvidia-caps:/dev/nvidia-caps
+                - mountPath: /dev/nvidia-caps
+                  name: nvidia-caps
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                  - matchExpressions:
+                      - key: kubernetes.io/hostname
+                        operator: In
+                        values:
+                          - gpu004
+                          - gpu008
+          volumes:
+            - emptyDir:
+                medium: Memory
+              name: dshm
+            # 定义 nvidia-caps hostPath
+            - name: nvidia-caps
+              hostPath:
+                path: /dev/nvidia-caps
+                type: Directory
